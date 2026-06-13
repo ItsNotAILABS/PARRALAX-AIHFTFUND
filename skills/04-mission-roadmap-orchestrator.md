@@ -1,4 +1,4 @@
-# Skill 05 — mission-roadmap-orchestrator
+# Skill 04 — mission-roadmap-orchestrator
 
 ## ALPHA MEDINA Architecture · Core Doctrine / Intelligence Layer
 

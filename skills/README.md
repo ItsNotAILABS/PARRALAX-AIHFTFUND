@@ -28,7 +28,7 @@ Each skill is a self-contained cognitive engine with three requirements:
 | 2 | `anti-drift-reviewer` | Audits for depth/doctrine/structure drift and red-team weakness | ✅ Built |
 | 3 | `doctrine-synthesizer` | Converts raw ideas into structured doctrine and frameworks | ✅ Built |
 | 4 | `mission-roadmap-orchestrator` | Turns projects into execution roadmaps with gates and risks | ✅ Built |
-| 5 | `resource-hub-organizer` | Organizes ideas into topics, subtopics, and release paths | ✅ Built |
+| 5 | `resource-hub-organizer` | Organizes ideas into topics, subtopics, collections, and release paths | ✅ Built |
 
 ### Wave 2 — Technical Core (Planned)
 
@@ -54,7 +54,7 @@ Each skill is a self-contained cognitive engine with three requirements:
 
 | # | Skill | Purpose | Status |
 |---|-------|---------|--------|
-| 16 | `resource-hub-organizer` | Organizes ideas into topics and release paths | 🔲 Planned |
+| 16 | `public-facing-hub-curator` | Curates public-facing resource collections and indexes | 🔲 Planned |
 | 17 | `public-doctrine-writer` | Converts doctrine into public-safe essays and reports | 🔲 Planned |
 | 18 | `research-map-builder` | Turns questions into research maps and argument trees | 🔲 Planned |
 | 19 | `construction-estimating-reviewer` | Reviews scopes, bids, risk, labor, schedule positioning | 🔲 Planned |

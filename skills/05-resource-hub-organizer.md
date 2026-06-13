@@ -1,4 +1,4 @@
-# Skill 05b — resource-hub-organizer
+# Skill 05 — resource-hub-organizer
 
 ## ALPHA MEDINA Architecture · Resource Hub / Public Output Layer
 
