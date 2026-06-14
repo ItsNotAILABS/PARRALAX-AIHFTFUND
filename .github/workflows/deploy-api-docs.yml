@@ -1,0 +1,237 @@
+name: Deploy Public API Documentation to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'python/parralax/public_api.py'
+      - 'python/parralax/fingerprint_service.py'
+      - 'python/parralax/expanded_vault.py'
+      - 'python/parralax/third_party_gateway.py'
+      - 'docs/THIRD_PARTY_API.md'
+      - '.github/workflows/deploy-api-docs.yml'
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install fastapi pydantic
+      
+      - name: Generate OpenAPI specification
+        run: |
+          mkdir -p docs/api
+          cat > /tmp/generate_openapi.py << 'EOF'
+          import sys
+          sys.path.insert(0, 'python')
+          from parralax.public_api import public_api_app
+          import json
+          
+          openapi_schema = public_api_app.openapi()
+          with open('docs/api/openapi.json', 'w') as f:
+              json.dump(openapi_schema, f, indent=2)
+          
+          print("✓ OpenAPI spec generated at docs/api/openapi.json")
+          EOF
+          python /tmp/generate_openapi.py
+      
+      - name: Create API index page
+        run: |
+          cat > docs/api/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>PARALLAX Public API Documentation</title>
+              <style>
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                      color: #333;
+                      line-height: 1.6;
+                  }
+                  .container {
+                      max-width: 1000px;
+                      margin: 0 auto;
+                      padding: 40px 20px;
+                  }
+                  header {
+                      background: white;
+                      padding: 40px;
+                      border-radius: 8px;
+                      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                      margin-bottom: 30px;
+                  }
+                  h1 { color: #1e3c72; font-size: 2.5em; margin-bottom: 10px; }
+                  .subtitle { color: #666; font-size: 1.1em; margin-bottom: 20px; }
+                  .status {
+                      display: inline-block;
+                      background: #4caf50;
+                      color: white;
+                      padding: 8px 16px;
+                      border-radius: 4px;
+                      font-weight: bold;
+                  }
+                  
+                  .section {
+                      background: white;
+                      padding: 30px;
+                      border-radius: 8px;
+                      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                      margin-bottom: 20px;
+                  }
+                  
+                  .section h2 {
+                      color: #1e3c72;
+                      margin-bottom: 15px;
+                      border-bottom: 2px solid #2a5298;
+                      padding-bottom: 10px;
+                  }
+                  
+                  .link-grid {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                      gap: 15px;
+                      margin-top: 15px;
+                  }
+                  
+                  .link-card {
+                      background: #f5f5f5;
+                      padding: 15px;
+                      border-radius: 6px;
+                      border-left: 4px solid #2a5298;
+                      transition: all 0.3s ease;
+                  }
+                  
+                  .link-card:hover {
+                      background: #e8f4f8;
+                      transform: translateX(5px);
+                  }
+                  
+                  .link-card a {
+                      color: #1e3c72;
+                      text-decoration: none;
+                      font-weight: bold;
+                  }
+                  
+                  .link-card p {
+                      color: #666;
+                      font-size: 0.9em;
+                      margin-top: 5px;
+                  }
+                  
+                  code {
+                      background: #f4f4f4;
+                      padding: 2px 6px;
+                      border-radius: 3px;
+                      font-family: 'Courier New', monospace;
+                  }
+                  
+                  footer {
+                      text-align: center;
+                      color: #999;
+                      margin-top: 40px;
+                      font-size: 0.9em;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <header>
+                      <h1>🌐 PARALLAX Public API</h1>
+                      <p class="subtitle">Third-Party AI System Integration Layer</p>
+                      <span class="status">✓ Operational</span>
+                  </header>
+                  
+                  <div class="section">
+                      <h2>📚 Documentation</h2>
+                      <div class="link-grid">
+                          <div class="link-card">
+                              <a href="../../THIRD_PARTY_API.md">Full API Documentation</a>
+                              <p>Complete specification with examples</p>
+                          </div>
+                          <div class="link-card">
+                              <a href="openapi.json">OpenAPI Specification</a>
+                              <p>Machine-readable API schema</p>
+                          </div>
+                          <div class="link-card">
+                              <a href="swagger-ui.html">Interactive API Explorer</a>
+                              <p>Try endpoints in your browser</p>
+                          </div>
+                      </div>
+                  </div>
+                  
+                  <div class="section">
+                      <h2>🚀 Quick Start</h2>
+                      <p>Base URL: <code>https://ItsNotAILABS.github.io/PARRALAX-AIHFTFUND/api/v1</code></p>
+                      <p>Get started:</p>
+                      <ol>
+                          <li>Read the <a href="../../THIRD_PARTY_API.md">full documentation</a></li>
+                          <li>Get your API key (contact: admin@parallax.example.com)</li>
+                          <li>Start making requests to available endpoints</li>
+                      </ol>
+                  </div>
+                  
+                  <div class="section">
+                      <h2>🔐 Key Endpoints</h2>
+                      <ul>
+                          <li><code>GET /api/v1/public/artifacts</code> - List PUBLIC artifacts with fingerprints</li>
+                          <li><code>GET /api/v1/public/index</code> - Hierarchical artifact index</li>
+                          <li><code>GET /api/v1/public/memory/entries</code> - Query PUBLIC memory (policy-gated)</li>
+                          <li><code>GET /api/v1/public/signals</code> - Trading signals from PARALLAX engine</li>
+                          <li><code>GET /api/v1/health</code> - API health status</li>
+                      </ul>
+                  </div>
+                  
+                  <div class="section">
+                      <h2>✨ Features</h2>
+                      <ul>
+                          <li><strong>Digital Fingerprints:</strong> SHA-256 verification for all artifacts</li>
+                          <li><strong>Policy-Gated Access:</strong> Only PUBLIC-tier content exposed</li>
+                          <li><strong>Hierarchical Index:</strong> Full artifact catalog with metadata</li>
+                          <li><strong>Memory Vault Queries:</strong> Access synthesized market insights</li>
+                          <li><strong>Rate Limiting:</strong> 1,000 requests/hour (with API key: 10,000)</li>
+                          <li><strong>Audit Trail:</strong> All access logged on ANIMA chain</li>
+                      </ul>
+                  </div>
+                  
+                  <footer>
+                      <p>PARALLAX Public API • Architect: Alfredo Medina Hernandez</p>
+                      <p>"Everything that exists inside PARALLAX was discovered, not invented."</p>
+                  </footer>
+              </div>
+          </body>
+          </html>
+          EOF
+          echo "✓ Created API documentation index"
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: './docs'
+      
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
+      
+      - name: Print deployment info
+        run: |
+          echo "✓ API documentation deployed!"
+          echo "URL: https://ItsNotAILABS.github.io/PARRALAX-AIHFTFUND/api/"
