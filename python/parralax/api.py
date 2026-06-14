@@ -9,12 +9,18 @@ from .agents import SignalAgent, RiskAgent, ExecutionAgent
 from .agents.base import AgentCapital
 from .paper_trading import PaperTradingEngine
 from .registry import ProtocolRegistry, AgentRegistry
+from .public_api import public_api_app
 
+# Main app for internal trading systems
 app = FastAPI(
-    title="PARRALAX-AIHFTFUND",
-    description="Sovereign AI-Native Financial Execution Infrastructure",
+    title="PARRALAX-AIHFTFUND Internal API",
+    description="Sovereign AI-Native Financial Execution Infrastructure (Internal)",
     version="0.1.0",
 )
+
+# Register public API as sub-application
+# Third-party AI systems access /api/v1/* endpoints
+app.mount("/api/v1", public_api_app)
 
 app.add_middleware(
     CORSMiddleware,
