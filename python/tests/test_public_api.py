@@ -45,7 +45,7 @@ class TestPublicAPIClient:
         
         vault_svc = get_vault_service()
         vault_svc.vaults.clear()
-        vault_svc.audit_logs.clear()
+        vault_svc.access_log.clear()
     
     def test_health_endpoint(self, client):
         """Test health check endpoint."""
@@ -184,7 +184,7 @@ class TestMemoryVaultQueries:
         """Setup vault data."""
         vault_svc = get_vault_service()
         vault_svc.vaults.clear()
-        vault_svc.audit_logs.clear()
+        vault_svc.access_log.clear()
         
         # Create a PUBLIC vault
         vault_svc.create_vault(
@@ -194,7 +194,7 @@ class TestMemoryVaultQueries:
         )
         
         # Add entries
-        vault_svc.store_entry(
+        vault_svc.add_entry(
             vault_id="public_vault",
             entry_id="mem_001",
             content_hash="hash123",
@@ -340,7 +340,7 @@ class TestMetadataOnly:
             access_level=AccessLevel.PUBLIC,
         )
         
-        vault_svc.store_entry(
+        vault_svc.add_entry(
             vault_id="test_vault",
             entry_id="mem_001",
             content_hash="hash123",
