@@ -1,9 +1,6 @@
 packages:
-  - src/**/*
-allowBuilds:
-  '@biomejs/biome': set this to true or false
-  esbuild: set this to true or false
-  sharp: set this to true or false
+  - src/frontend
+
 onlyBuiltDependencies:
   - '@biomejs/biome'
   - esbuild
