@@ -1,0 +1,26 @@
+name: parallax-wallet-aos
+
+on:
+  push:
+    paths:
+      - 'systems/parallax-wallet-aos/**'
+      - '.github/workflows/parallax-wallet-aos-ci.yml'
+  pull_request:
+    paths:
+      - 'systems/parallax-wallet-aos/**'
+      - '.github/workflows/parallax-wallet-aos-ci.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install-free validation
+        working-directory: systems/parallax-wallet-aos
+        run: npm test
+      - name: Demo snapshot
+        working-directory: systems/parallax-wallet-aos
+        run: npm run demo
