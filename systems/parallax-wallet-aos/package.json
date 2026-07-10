@@ -1,0 +1,17 @@
+{
+  "name": "parallax-wallet-aos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Proof-governed wallet, transfer, treasury, and agent operating interface layer for PARALLAX.",
+  "main": "src/server.js",
+  "scripts": {
+    "test": "node tests/wallet_aos.test.js",
+    "demo": "node src/cli.js demo",
+    "server": "node src/server.js",
+    "validate": "node tests/wallet_aos.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED"
+}
