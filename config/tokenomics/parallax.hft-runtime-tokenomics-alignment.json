@@ -1,0 +1,42 @@
+{
+  "schema": "parallax.hft.runtime_tokenomics_alignment.v1",
+  "repo": "ItsNotAILABS/PARRALAX-AIHFTFUND",
+  "agent_id": "parallax-hft-fund-agent",
+  "mode": "paper_testnet_internal_credit_only",
+  "canonical_clearing_repo": "ItsNotAILABS/PARALLAX-Exchange-Clearinghouse",
+  "governance_repo": "ItsNotAILABS/SNS---TOKEN",
+  "event_classes": [
+    {
+      "event": "market_data_scan",
+      "records": ["PXBYTE", "PXNOVA"],
+      "requires_receipt": true
+    },
+    {
+      "event": "strategy_backtest_or_simulation",
+      "consumes": ["PXGPU"],
+      "records": ["PXRCPT", "PXNOVA"],
+      "requires_receipt": true
+    },
+    {
+      "event": "paper_order_proposal",
+      "records": ["PXAI", "PXRCPT"],
+      "settles_through": "parallax-clearinghouse-agent",
+      "requires_operator_gate": true
+    },
+    {
+      "event": "research_artifact_publication",
+      "records": ["PXBYTE", "PXAI", "PXRCPT"],
+      "requires_claim_boundary": true
+    }
+  ],
+  "blocked_claims": [
+    "live_fund_performance",
+    "guaranteed_returns",
+    "investment_advice",
+    "autonomous_live_trading",
+    "broker_execution",
+    "custody",
+    "public_token_value"
+  ],
+  "first_integration": "Emit paper/testnet order proposal receipts that the Clearinghouse agent can accept, reject, settle, or export."
+}
