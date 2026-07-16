@@ -1,0 +1,54 @@
+{
+  "schema": "parallax.runtime.agent.v1",
+  "agent_id": "parallax-hft-fund-agent",
+  "public_name": "PARALLAX HFT Fund Agent",
+  "internal_name": "NOVA-HFT",
+  "repo": "ItsNotAILABS/PARRALAX-AIHFTFUND",
+  "role": "Agentic trading research, strategy simulation, market-data, paper/testnet execution proposal, benchmark, and signal orchestration agent.",
+  "platform_position": "agentic_trading_and_strategy_runtime",
+  "canonical_counterparty": "parallax-clearinghouse-agent",
+  "governance_counterparty": "sns-token-governor-agent",
+  "inputs": [
+    "market_data_event",
+    "strategy_signal",
+    "paper_order_intent",
+    "wallet_aos_event",
+    "benchmark_result",
+    "risk_limit_state",
+    "operator_instruction"
+  ],
+  "outputs": [
+    "strategy_proposal",
+    "paper_order_request",
+    "risk_gate_packet",
+    "benchmark_receipt",
+    "compute_usage_receipt",
+    "agentic_trading_research_artifact"
+  ],
+  "tokenomics_alignment": {
+    "consumes": ["PXGPU", "PXNOVA"],
+    "earns_or_records": ["PXAI", "PXRCPT", "PXBYTE"],
+    "settles_through": ["PXCRED", "PXUSD"],
+    "mode": "paper_testnet_internal_credit_only"
+  },
+  "blocked_capabilities": [
+    "autonomous_live_trading",
+    "broker_order_routing",
+    "custody_or_private_key_handling",
+    "investment_advice_claim",
+    "fund_performance_claim",
+    "yield_or_profit_promise",
+    "real_money_movement"
+  ],
+  "runtime_lanes": [
+    "market_data",
+    "strategy_research",
+    "paper_order_proposal",
+    "risk_gate",
+    "benchmark",
+    "wallet_aos",
+    "receipt_forwarding"
+  ],
+  "first_runtime_task": "Convert strategy and market events into governed paper/testnet proposals with receipts, then forward approved accounting events to the Clearinghouse agent.",
+  "production_boundary": "This manifest makes the HFT repo an agentic trading runtime lane; it does not claim live fund operations, broker routing, custody, regulated investment activity, or autonomous live trading."
+}
