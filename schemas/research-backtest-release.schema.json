@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://itsnotailabs.dev/schemas/parallax-research-backtest-release.schema.json",
+  "title": "PARALLAX Research Backtest Release",
+  "type": "object",
+  "required": ["strategy_pack", "evidence", "research_only", "operator_approval_required"],
+  "properties": {
+    "strategy_pack": { "type": "string" },
+    "evidence": { "type": "array", "items": { "type": "string" } },
+    "research_only": { "type": "boolean" },
+    "operator_approval_required": { "type": "boolean" }
+  }
+}
