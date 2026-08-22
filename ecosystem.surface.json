@@ -1,0 +1,13 @@
+{
+  "schema":"nexus.capability.v1",
+  "component":"parralax",
+  "repository":"ItsNotAILABS/PARRALAX-AIHFTFUND",
+  "role":"verifiable-market-research-risk-and-execution-coordination-plane",
+  "actions":["market.signal.analyze","market.risk.evaluate","market.order.plan","market.execution.simulate","market.receipt.verify","market.portfolio.snapshot","market.release_evidence"],
+  "risk_tiers":{"market.signal.analyze":"read","market.risk.evaluate":"read","market.order.plan":"plan","market.execution.simulate":"compute-bounded","market.receipt.verify":"read","market.portfolio.snapshot":"read-sensitive","market.release_evidence":"read"},
+  "produces":["nexus.policy-decision.v1","nexus.execution-receipt.v1","nexus.telemetry.v1","nexus.artifact.v1","nexus.release-evidence.v1"],
+  "consumes":["nexus.task.v1","nexus.budget.v1","nexus.policy-decision.v1","nexus.context-pack.v1"],
+  "limits":{"live_broker_execution_default":false,"paper_or_simulation_by_default":true,"irreversible_financial_action_requires_operator":true,"performance_claim_requires_receipt":true,"private_reasoning_export":false},
+  "proof":{"state":"source","live_execution_requires_broker_and_transaction_evidence":true},
+  "authority":"ItsNotAILABS/nexus"
+}
