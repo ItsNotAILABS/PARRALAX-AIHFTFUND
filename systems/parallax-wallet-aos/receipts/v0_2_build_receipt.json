@@ -1,0 +1,18 @@
+{
+  "system": "PARALLAX Wallet AOS",
+  "version": "0.2.0",
+  "status": "SANDBOX_ONLY_PERSISTENCE_RECONCILIATION_LAYER",
+  "liveMoneyMovement": false,
+  "liveTrading": false,
+  "added": [
+    "persistent_json_vault",
+    "snapshot_hash_verification",
+    "storage_receipts",
+    "reconciliation_reports",
+    "wallet_statements",
+    "treasury_roles",
+    "approval_quorum",
+    "operator_dashboard_contract"
+  ],
+  "createdAt": "2026-07-09T00:00:00.000Z"
+}

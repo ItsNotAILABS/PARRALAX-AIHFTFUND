@@ -1,0 +1,32 @@
+{
+  "schema": "nova-ecosystem-feeder-release-v1",
+  "repo": "ItsNotAILABS/PARRALAX-AIHFTFUND",
+  "release": "parallax-aihft-research-v1.0.0",
+  "status": "production-harness-candidate",
+  "feeds": [
+    "nova-model-family-v1.0.0",
+    "parallax-strategy-research",
+    "parallax-wallet-boundary"
+  ],
+  "evidence": [
+    { "kind": "overview", "path": "docs/release-harness/README.md" },
+    { "kind": "model-card", "path": "docs/release-harness/model-cards/parallax-aihft-research.md" },
+    { "kind": "schema", "path": "schemas/ecosystem-feeder.schema.json" },
+    { "kind": "schema", "path": "schemas/research-backtest-release.schema.json" },
+    { "kind": "validator", "path": "scripts/validate-ecosystem-release.mjs" },
+    { "kind": "workflow", "path": ".github/workflows/ecosystem-release-harness.yml" }
+  ],
+  "boundaries": [
+    "research backtest only",
+    "no live trading authority",
+    "no investment advice",
+    "no custody claim",
+    "no performance guarantee",
+    "operator approval required"
+  ],
+  "approvals": {
+    "operator": false,
+    "legal": false,
+    "security": false
+  }
+}

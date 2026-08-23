@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://itsnotailabs.dev/schemas/nova-ecosystem-feeder.schema.json",
+  "title": "NOVA Ecosystem Feeder Manifest",
+  "type": "object",
+  "required": ["schema", "repo", "release", "feeds", "evidence", "boundaries", "approvals"],
+  "properties": {
+    "schema": { "const": "nova-ecosystem-feeder-release-v1" },
+    "repo": { "type": "string" },
+    "release": { "type": "string" },
+    "feeds": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "evidence": { "type": "array", "items": { "type": "object" }, "minItems": 1 },
+    "boundaries": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "approvals": { "type": "object" }
+  }
+}

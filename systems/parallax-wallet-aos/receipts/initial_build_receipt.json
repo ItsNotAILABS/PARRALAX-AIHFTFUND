@@ -1,0 +1,16 @@
+{
+  "system": "PARALLAX Wallet AOS",
+  "version": "0.1.0",
+  "status": "SANDBOX_ONLY_SYSTEM_TEST_LAYER",
+  "liveMoneyMovement": false,
+  "liveTrading": false,
+  "rails": [
+    "internal_ledger_sandbox",
+    "bank_wire_sandbox",
+    "ach_sandbox",
+    "card_sandbox",
+    "crypto_sandbox",
+    "icp_sandbox"
+  ],
+  "createdAt": "2026-07-09T00:00:00.000Z"
+}

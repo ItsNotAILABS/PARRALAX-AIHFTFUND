@@ -1,0 +1,26 @@
+name: PARRALAX AIHFT Ecosystem Release Harness
+
+on:
+  pull_request:
+    paths:
+      - 'docs/release-harness/**'
+      - 'schemas/**'
+      - 'scripts/validate-ecosystem-release.mjs'
+      - '.github/workflows/ecosystem-release-harness.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/release-harness/**'
+      - 'schemas/**'
+      - 'scripts/validate-ecosystem-release.mjs'
+
+jobs:
+  validate-release-harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate ecosystem release harness
+        run: node scripts/validate-ecosystem-release.mjs
