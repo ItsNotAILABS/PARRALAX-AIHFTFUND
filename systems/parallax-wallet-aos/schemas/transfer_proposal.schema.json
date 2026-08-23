@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://itsnotailabs.local/schemas/parallax/transfer_proposal.schema.json",
+  "title": "PARALLAX Transfer Proposal",
+  "type": "object",
+  "required": ["sourceWalletId", "destination", "amountMinor", "currency", "rail"],
+  "properties": {
+    "sourceWalletId": { "type": "string", "minLength": 1 },
+    "destination": { "type": "object" },
+    "amountMinor": { "type": "integer", "minimum": 1 },
+    "currency": { "type": "string", "minLength": 3, "maxLength": 8 },
+    "rail": { "type": "string" },
+    "memo": { "type": "string" },
+    "metadata": { "type": "object" }
+  }
+}
