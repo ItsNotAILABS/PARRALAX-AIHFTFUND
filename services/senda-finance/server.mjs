@@ -1,6 +1,7 @@
 import http from "node:http";
 import { timingSafeEqual, createHash } from "node:crypto";
 import { evaluateRisk, planExit, planOrder, research } from "./core.mjs";
+import { evaluateAgentBudget } from "./budgets.mjs";
 function authorized(raw, token) {
   if (!token || token.length < 32 || !raw?.startsWith("Bearer ")) return false;
   return timingSafeEqual(createHash("sha256").update(raw.slice(7)).digest(),createHash("sha256").update(token).digest());
@@ -11,7 +12,8 @@ export function createFinanceServer({ token, now = Date.now, audit = () => {} })
     "/v1/market/research": research,
     "/v1/risk/evaluate": evaluateRisk,
     "/v1/execution/plan": planOrder,
-    "/v1/execution/exit-plan": (p) => planExit(p, now())
+    "/v1/execution/exit-plan": (p) => planExit(p, now()),
+    "/v1/agents/budget-evaluate": (p) => evaluateAgentBudget(p,now())
   };
   return http.createServer(async (req,res)=>{
     const answer = (status,body)=>{res.writeHead(status,{"content-type":"application/json","cache-control":"no-store"});res.end(JSON.stringify(body));};
