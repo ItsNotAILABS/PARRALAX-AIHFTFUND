@@ -7,6 +7,7 @@ This service adds PARRALAX-owned v1 HTTP endpoints that match Senda's already-cr
 - POST /v1/risk/evaluate — deterministic fail-closed risk filter
 - POST /v1/execution/plan — plan-only risk result
 - POST /v1/execution/exit-plan — independently supplied quote comparison, **not** resting liquidity or guaranteed executable routing
+- POST /v1/agents/budget-evaluate — deterministic agent-budget policy check; no reservation or signing
 
 All responses carry `schema: parralax.response.v1` and the requestId. Other Senda gateway routes remain unimplemented and return 404; do not fabricate receipts or clearing outputs.
 
