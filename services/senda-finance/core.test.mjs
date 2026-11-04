@@ -8,11 +8,12 @@ test("risk denies missing evidence or exceeded limits",()=>{
   for(const patch of cases)assert.equal(evaluateRisk({...risk,...patch}).decision,"DENY");
 });
 test("risk denies NaN and invalid strings",()=>{for(const n of [NaN,Infinity,-1,0])assert.equal(evaluateRisk({...risk,notionalUsd:n}).decision,"DENY")});
-const t=Date.now(), base={requestId:"r1",instrument:"SOL",positionSide:"long",size:100,maxAgeMs:2000,maxImpactBps:80,observations:[]};
+const t=Date.now(), base={requestId:"r1",instrument:"SOL",positionSide:"long",positionVenue:"jupiter",size:100,maxAgeMs:2000,maxImpactBps:80,observations:[]};
 const obs={venue:"jupiter",instrument:"SOL",positionSide:"long",executableSize:100,expectedOutputUsd:99,priceImpactBps:12,observedAt:t,source:"jupiter-route-quote",verified:true,walletOrAccountEligible:true};
 test("exit planning ranks fresh eligible observations without executing",()=>{
  const res=planExit({...base,observations:[{...obs,venue:"hyperliquid",expectedOutputUsd:101},obs]},t);
- assert.equal(res.decision,"REVIEW_REQUIRED");assert.equal(res.routes[0].venue,"hyperliquid");assert.equal(res.executionAuthorized,false);
+ assert.equal(res.decision,"REVIEW_REQUIRED");assert.equal(res.routes[0].venue,"jupiter");assert.equal(res.executionAuthorized,false);
+ assert.equal(res.rejected[0].reason,"POSITION_IS_VENUE_BOUND");
 });
 test("exit denies stale, insufficient, bad, candidate and ineligible routes",()=>{
  const cases=[{observedAt:t-3000},{executableSize:99},{verified:false},{walletOrAccountEligible:false},{venue:"drift"},{priceImpactBps:81},{instrument:"ETH"}];
