@@ -36,6 +36,7 @@ export function evaluateRisk(p) {
 export function planExit(input, now = Date.now()) {
   if (!input || !validId(input.requestId) || !validSymbol(input.instrument) ||
       !["long","short","spot"].includes(input.positionSide) || !finitePositive(input.size) ||
+      (input.positionSide !== "spot" && (!input.positionVenue || !Object.hasOwn(VENUES,input.positionVenue))) ||
       !Number.isFinite(input.maxAgeMs) || input.maxAgeMs < 0 ||
       !Number.isFinite(input.maxImpactBps) || input.maxImpactBps < 0 ||
       !Array.isArray(input.observations)) {
@@ -51,6 +52,7 @@ export function planExit(input, now = Date.now()) {
       typeof x.source === "string" && x.source.length > 4 &&
       x.walletOrAccountEligible === true && x.verified === true &&
       VENUES[x.venue].execution !== "candidate-adapter";
+    if (valid && input.positionSide !== "spot" && x.venue !== input.positionVenue) { rejected.push({ venue: x.venue, reason: "POSITION_IS_VENUE_BOUND" }); continue; }
     if (!valid) { rejected.push({ venue: String(x?.venue ?? "unknown"), reason: "INVALID_OR_UNVERIFIED_OBSERVATION" }); continue; }
     if (now - x.observedAt > input.maxAgeMs) { rejected.push({ venue: x.venue, reason: "STALE_OBSERVATION" }); continue; }
     if (x.priceImpactBps > input.maxImpactBps) { rejected.push({ venue: x.venue, reason: "IMPACT_LIMIT" }); continue; }
