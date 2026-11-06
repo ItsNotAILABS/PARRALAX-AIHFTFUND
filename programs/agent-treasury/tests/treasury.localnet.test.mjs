@@ -19,7 +19,7 @@ const sysId = new PublicKey("11111111111111111111111111111111");
 const provider = AnchorProvider.local();
 const connection = provider.connection;
 const owner = provider.wallet;
-const idl = JSON.parse(fs.readFileSync(new URL("../target/idl/parralax_agent_treasury.json", import.meta.url),"utf8"));
+const idl = JSON.parse(fs.readFileSync(new URL("../../../target/idl/parralax_agent_treasury.json", import.meta.url),"utf8"));
 const program = new Program(idl, provider);
 const programId = program.programId;
 if (programId.equals(sysId)) throw new Error("Treasury program ID is still placeholder");
