@@ -1,0 +1,32 @@
+name: agent-treasury-source-gates
+on:
+  pull_request:
+    paths:
+      - "programs/agent-treasury/**"
+      - ".github/workflows/agent-treasury-source-gates.yml"
+  workflow_dispatch:
+jobs:
+  rust-and-source:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: programs/agent-treasury
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Rust unit tests
+        run: cargo test --manifest-path Cargo.toml --locked
+      - name: Program source checks
+        run: node --test tests/preflight.test.mjs
+      - name: Deployment blocker audit
+        run: |
+          if grep -q 'declare_id!("11111111111111111111111111111111")' src/lib.rs; then
+            echo "Undeployed placeholder program ID; source-only validation, deploy blocked"
+          else
+            echo "Custom ID configured. Deployment still requires local validator and audit proof."
+          fi
