@@ -5,10 +5,10 @@
 ## Local validation
 1. Install the verified Solana CLI, Rust, Anchor CLI **0.30.1**, Node >=20, npm.
 2. `solana config set --url localhost`; start `solana-test-validator --reset` in a dedicated terminal.
-3. From `programs/agent-treasury/`, generate a *new local-only program key*: `solana-keygen new --no-bip39-passphrase --outfile target/deploy/parralax_agent_treasury-keypair.json`.
-4. Record the public address with `solana-keygen pubkey target/deploy/parralax_agent_treasury-keypair.json`. Replace placeholder IDs in `src/lib.rs` and `Anchor.toml` with that exact address. Do not commit the deploy keypair or place it under a browser bundle.
+3. From the **repository root** (the root `Anchor.toml` owns this workspace), generate a *new local-only program key*: `solana-keygen new --no-bip39-passphrase --outfile target/deploy/parralax_agent_treasury-keypair.json`.
+4. Record the public address with `solana-keygen pubkey target/deploy/parralax_agent_treasury-keypair.json`. Replace placeholder IDs in `programs/agent-treasury/src/lib.rs`, **root** `Anchor.toml` and `programs/agent-treasury/Anchor.toml` with that exact address. Do not commit the deploy keypair or place it under a browser bundle.
 5. `anchor build` and `anchor deploy --provider.cluster localnet`. Verify program account owner, executable state, correct program ID and upgrade authority with Solana CLI.
-6. `npm install`; `npm run test:localnet`. Collect **actual** validator signatures, account deltas, and transaction logs. Run source check with `npm run test:source`.
+6. `cd programs/agent-treasury && npm install && npm run test:localnet`. Collect **actual** validator signatures, account deltas, and transaction logs. Run source check with `npm run test:source`. The source test harness loads the root-workspace `target/idl` artifact.
 7. Repeat tests for invalid token account, wrong beneficiary, forged agent, expired vault, wrong mint, vault drained, wrong nonce, over-budget, rolled day, and failed CPI rollback. Audit before any outside funding.
 
 ## Devnet
@@ -26,3 +26,6 @@
 
 ## Release status
 `NODE`, `cargo`, `anchor`, and `solana` were not all available in the authoring runtime. GitHub source updates completed, but Rust compilation, local validator tests, devnet transaction, security audit and production deployment **have not run**.
+
+## CI status note (2026-11-06)
+GitHub reported completed/failing jobs for the new source-check workflow but returned zero step summaries, and job-log downloads returned 404. This is **not** a Rust compiler diagnostic or a passing test receipt. Investigate GitHub Actions runner availability, job provisioning and billing before interpreting it as a source failure.
