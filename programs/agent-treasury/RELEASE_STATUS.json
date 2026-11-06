@@ -1,0 +1,44 @@
+{
+  "schema": "parralax.agent-treasury.release-evidence.v1",
+  "recordedAt": "2026-11-06",
+  "status": "SOURCE_ONLY_NOT_DEPLOYABLE",
+  "sourceRepository": "ItsNotAILABS/PARRALAX-AIHFTFUND",
+  "sourcePullRequest": "https://github.com/ItsNotAILABS/PARRALAX-AIHFTFUND/pull/17",
+  "sendaPullRequest": "https://github.com/ItsNotAILABS/Senda/pull/36",
+  "proof": {
+    "anchorSource": true,
+    "spendingPolicySource": true,
+    "ownerFundingAndWithdrawalSource": true,
+    "adversarialValidatorTestSource": true,
+    "sendaInstructionBuilderSource": true,
+    "sendaReceiptContractSource": true,
+    "rustCompiled": false,
+    "solanaSbfBuilt": false,
+    "localValidatorExecuted": false,
+    "devnetDeployed": false,
+    "devnetProgramId": null,
+    "devnetTransactionSignatures": [],
+    "transactionConfirmationVerified": false,
+    "audited": false,
+    "liveAutonomousAgentPaidApiCalls": false,
+    "benchmarkP95Ms": null
+  },
+  "ci": {
+    "observed": "completed failure",
+    "stepsAvailable": false,
+    "logsAvailable": false,
+    "interpretation": "Runner/job provisioning or source failure undetermined; never treat as a successful test"
+  },
+  "blockers": [
+    "Replace placeholder program ID with a managed deploy keypair",
+    "Install and pin Rust/Solana/Anchor toolchain",
+    "Resolve CI failing jobs and obtain logs",
+    "Build SBF and run local validator adversarial suite",
+    "Deploy isolated devnet program and verify SPL transfers",
+    "Connect secure isolated agent signer and tenant durable budgets",
+    "Independently verify finality and publish receipts",
+    "Review program security and custody/compliance"
+  ],
+  "replaySafe": true,
+  "note": "This is a truth-status manifest, not a hash-signed external audit or proof of transactions."
+}
