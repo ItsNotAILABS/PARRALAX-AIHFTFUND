@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: "22"
       - name: Rust unit tests
-        run: cargo test --manifest-path Cargo.toml --locked
+        run: cargo test --manifest-path Cargo.toml
       - name: Program source checks
         run: node --test tests/preflight.test.mjs
       - name: Deployment blocker audit
