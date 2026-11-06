@@ -17,7 +17,9 @@ pub mod parralax_agent_treasury {
         lifetime_cap: u64,
         expires_at: i64,
     ) -> Result<()> {
-        require!(per_tx_cap > 0 && per_tx_cap <= daily_cap && daily_cap <= lifetime_cap, ErrorCode::InvalidCaps);
+        require!(valid_caps(per_tx_cap, daily_cap, lifetime_cap), ErrorCode::InvalidCaps);
+        require_keys_neq!(ctx.accounts.owner.key(), ctx.accounts.agent.key(), ErrorCode::InvalidAuthority);
+        require_keys_neq!(ctx.accounts.agent.key(), ctx.accounts.beneficiary.key(), ErrorCode::InvalidAuthority);
         let now = Clock::get()?.unix_timestamp;
         require!(expires_at > now, ErrorCode::Expired);
         let t = &mut ctx.accounts.treasury;
@@ -70,6 +72,8 @@ pub mod parralax_agent_treasury {
             t.window_start = now;
             t.daily_spent = 0;
         }
+        require!(checked_spend(t.daily_spent, amount, t.daily_cap), ErrorCode::DailyLimit);
+        require!(checked_spend(t.lifetime_spent, amount, t.lifetime_cap), ErrorCode::LifetimeLimit);
         let daily = t.daily_spent.checked_add(amount).ok_or(ErrorCode::Overflow)?;
         let lifetime = t.lifetime_spent.checked_add(amount).ok_or(ErrorCode::Overflow)?;
         require!(daily <= t.daily_cap, ErrorCode::DailyLimit);
@@ -80,8 +84,10 @@ pub mod parralax_agent_treasury {
 
         let owner = t.owner;
         let agent = t.agent;
+        let beneficiary = t.beneficiary;
+        let mint = t.mint;
         let bump = [t.bump];
-        let seeds: &[&[u8]] = &[b"treasury", owner.as_ref(), agent.as_ref(), &bump];
+        let seeds: &[&[u8]] = &[b"treasury", owner.as_ref(), agent.as_ref(), beneficiary.as_ref(), mint.as_ref(), &bump];
         token::transfer_checked(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
@@ -143,7 +149,7 @@ pub struct Initialize<'info> {
     pub mint: Account<'info, Mint>,
     #[account(
         init, payer = owner, space = 8 + Treasury::INIT_SPACE,
-        seeds = [b"treasury", owner.key().as_ref(), agent.key().as_ref()],
+        seeds = [b"treasury", owner.key().as_ref(), agent.key().as_ref(), beneficiary.key().as_ref(), mint.key().as_ref()],
         bump
     )]
     pub treasury: Account<'info, Treasury>,
@@ -240,6 +246,7 @@ pub struct TreasuryWithdrawal { pub treasury: Pubkey, pub owner: Pubkey, pub amo
 
 #[error_code]
 pub enum ErrorCode {
+    #[msg("Owner, agent and beneficiary must have distinct authority")] InvalidAuthority,
     #[msg("Invalid spending caps")] InvalidCaps,
     #[msg("Treasury expired")] Expired,
     #[msg("Treasury revoked")] Revoked,
@@ -250,4 +257,29 @@ pub enum ErrorCode {
     #[msg("Invalid replay nonce")] InvalidNonce,
     #[msg("Arithmetic overflow")] Overflow,
     #[msg("Clock regression")] ClockRegression,
+}
+
+fn valid_caps(per_tx: u64, daily: u64, lifetime: u64) -> bool {
+    per_tx > 0 && per_tx <= daily && daily <= lifetime
+}
+fn checked_spend(current: u64, amount: u64, cap: u64) -> bool {
+    current.checked_add(amount).map(|next| next <= cap).unwrap_or(false)
+}
+#[cfg(test)]
+mod invariant_tests {
+    use super::*;
+    #[test]
+    fn cap_ordering() {
+        assert!(valid_caps(1, 10, 100));
+        assert!(!valid_caps(0, 10, 100));
+        assert!(!valid_caps(11, 10, 100));
+        assert!(!valid_caps(1, 101, 100));
+    }
+    #[test]
+    fn spending_arithmetic_and_limits() {
+        assert!(checked_spend(7, 3, 10));
+        assert!(!checked_spend(8, 3, 10));
+        assert!(!checked_spend(u64::MAX, 1, u64::MAX));
+        assert!(checked_spend(0, 1, 1));
+    }
 }
