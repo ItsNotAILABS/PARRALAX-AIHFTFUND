@@ -70,6 +70,17 @@ test("initialize, deposit, spend, replay, cap, revoke, owner withdrawal",async t
  });
  await t.test("replayed nonce denied",async()=>mustReject(()=>signAgent(100_000,0),"replayed nonce accepted"));
  await t.test("per transaction cap denied",async()=>mustReject(()=>signAgent(1_000_001,1),"over-cap spend accepted"));
+ await t.test("wrong agent cannot spend",async()=>{
+  const attacker=Keypair.generate();
+  await mustReject(()=>program.methods.spend(new BN(1),new BN(1))
+   .accounts({agent:attacker.publicKey,treasury,mint,vault,beneficiaryToken:beneficiaryToken.address,tokenProgram:TOKEN_PROGRAM_ID})
+   .signers([attacker]).rpc(),"wrong agent signed spend");
+ });
+ await t.test("wrong beneficiary token account cannot receive funds",async()=>{
+  await mustReject(()=>program.methods.spend(new BN(1),new BN(1))
+   .accounts({agent:agent.publicKey,treasury,mint,vault,beneficiaryToken:tokenSource.address,tokenProgram:TOKEN_PROGRAM_ID})
+   .signers([agent]).rpc(),"token went to wrong beneficiary");
+ });
  await t.test("daily spending cumulative cap denied",async()=>{
   await signAgent(1_000_000,1);
   await mustReject(()=>signAgent(600_000,2),"daily cap bypassed");
@@ -78,6 +89,12 @@ test("initialize, deposit, spend, replay, cap, revoke, owner withdrawal",async t
   await program.methods.revoke().accounts({owner:owner.publicKey,treasury}).rpc();
   assert.equal((await program.account.treasury.fetch(treasury)).revoked,true);
   await mustReject(()=>signAgent(1,2),"revoked agent spent");
+ });
+ await t.test("unauthorized wallet cannot withdraw",async()=>{
+  const attacker=Keypair.generate();
+  await mustReject(()=>program.methods.withdraw(new BN(1)).accounts({
+   owner:attacker.publicKey,treasury,mint,vault,ownerToken:tokenSource.address,tokenProgram:TOKEN_PROGRAM_ID
+  }).signers([attacker]).rpc(),"non-owner withdrew funds");
  });
  await t.test("owner can withdraw remaining vault balance",async()=>{
   const remaining=(await getAccount(connection,vault)).amount;
