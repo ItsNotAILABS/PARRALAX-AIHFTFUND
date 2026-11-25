@@ -117,8 +117,12 @@ pub mod parralax_agent_treasury {
         let t = &ctx.accounts.treasury;
         let owner = t.owner;
         let agent = t.agent;
+        let beneficiary = t.beneficiary;
+        let mint = t.mint;
         let bump = [t.bump];
-        let seeds: &[&[u8]] = &[b"treasury", owner.as_ref(), agent.as_ref(), &bump];
+        // Must match the Initialize PDA seeds exactly, otherwise invoke_signed
+        // signs for a different address and every owner withdrawal fails.
+        let seeds: &[&[u8]] = &[b"treasury", owner.as_ref(), agent.as_ref(), beneficiary.as_ref(), mint.as_ref(), &bump];
         token::transfer_checked(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
