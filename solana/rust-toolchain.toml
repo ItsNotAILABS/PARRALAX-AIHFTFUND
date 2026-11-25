@@ -1,0 +1,6 @@
+# Host toolchain for tests, clippy and the Anchor 0.30.1 CLI/IDL build.
+# SBF builds use Solana platform-tools pinned in Anchor.toml / CI.
+[toolchain]
+channel = "1.79.0"
+components = ["clippy", "rustfmt"]
+profile = "minimal"

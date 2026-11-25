@@ -1,0 +1,35 @@
+[package]
+name = "parralax-agent-treasury"
+version = "0.2.0"
+edition = "2021"
+# SBF platform-tools v1.41 (Solana 1.18) ship rustc 1.75; keep the lockfile resolvable for it.
+rust-version = "1.75.0"
+description = "Bounded SPL-token treasury for PARRALAX governed agents"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "parralax_agent_treasury"
+
+[features]
+default = []
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+# anchor-spl 0.30.1 idl-build references token_interface, so it needs token_2022 (IDL builds only).
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "anchor-spl/token_2022"]
+# Only accept mints on mint_policy::ALLOWED_MINTS (e.g. USDC), even if a mint
+# has no freeze authority. Recommended for production builds.
+allowlist-only = []
+
+[dependencies]
+anchor-lang = "=0.30.1"
+anchor-spl = { version = "=0.30.1", default-features = false, features = ["token", "associated_token"] }
+
+[dev-dependencies]
+solana-program-test = "=1.18.26"
+solana-sdk = "=1.18.26"
+spl-token = { version = "=4.0.0", features = ["no-entrypoint"] }
+spl-associated-token-account = { version = "=3.0.2", features = ["no-entrypoint"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
