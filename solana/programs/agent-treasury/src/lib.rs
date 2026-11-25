@@ -1,48 +1,154 @@
+//! PARRALAX agent treasury: a bounded SPL-token vault controlled by a PDA.
+//!
+//! Roles
+//! - owner: creates, funds, configures, withdraws from and closes a treasury.
+//! - agent: may only `spend` to the fixed beneficiary, within the caps.
+//! - guardian (optional): may only `pause` and `revoke`.
+//!
+//! SOURCE ONLY / UNAUDITED. See ../../DEPLOYMENT.md before any deployment.
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
+use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, TransferChecked};
 
-declare_id!("11111111111111111111111111111111");
+pub mod error;
+pub mod mint_policy;
+pub mod policy;
+pub mod state;
 
-// PLACEHOLDER PROGRAM ID: Replace with a freshly generated, verifiable program key
-// before any build/deployment. This source is NOT deployed.
+pub use error::TreasuryError;
+pub use state::{Treasury, TREASURY_SEED, TREASURY_VERSION};
+
+// LOCALNET / TEST ONLY program ID (keypair is not committed). Replace with the
+// managed production program ID before any non-local deployment.
+declare_id!("5HJCtwtWWvDDQiMLVuvrwyqaVfXgX3hZnzMTarTKv61p");
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PolicyParams {
+    pub per_tx_cap: u64,
+    pub daily_cap: u64,
+    pub lifetime_cap: u64,
+    pub expires_at: i64,
+}
+
+impl PolicyParams {
+    fn validate(&self, now: i64) -> Result<()> {
+        require!(
+            policy::valid_caps(self.per_tx_cap, self.daily_cap, self.lifetime_cap),
+            TreasuryError::InvalidCaps
+        );
+        require!(self.expires_at > now, TreasuryError::InvalidExpiry);
+        Ok(())
+    }
+}
+
+/// PDA signer seeds for a treasury. The single source of truth used by every
+/// instruction that moves funds out of the vault (review finding C1).
+pub fn treasury_signer_seeds<'a>(
+    owner: &'a Pubkey,
+    mint: &'a Pubkey,
+    seed_id: &'a [u8; 8],
+    bump: &'a [u8; 1],
+) -> [&'a [u8]; 5] {
+    [TREASURY_SEED, owner.as_ref(), mint.as_ref(), seed_id, bump]
+}
+
+fn transfer_from_vault<'info>(
+    treasury: &Account<'info, Treasury>,
+    vault: &Account<'info, TokenAccount>,
+    mint: &Account<'info, Mint>,
+    to: AccountInfo<'info>,
+    token_program: &Program<'info, Token>,
+    amount: u64,
+) -> Result<()> {
+    let seed_id = treasury.seed_id.to_le_bytes();
+    let bump = [treasury.bump];
+    let seeds = treasury_signer_seeds(&treasury.owner, &treasury.mint, &seed_id, &bump);
+    token::transfer_checked(
+        CpiContext::new_with_signer(
+            token_program.to_account_info(),
+            TransferChecked {
+                from: vault.to_account_info(),
+                mint: mint.to_account_info(),
+                to,
+                authority: treasury.to_account_info(),
+            },
+            &[&seeds],
+        ),
+        amount,
+        mint.decimals,
+    )
+}
+
+fn validate_agent(
+    agent: &Pubkey,
+    owner: &Pubkey,
+    beneficiary: &Pubkey,
+    guardian: Option<Pubkey>,
+) -> Result<()> {
+    require_keys_neq!(*agent, *owner, TreasuryError::InvalidAuthority);
+    require_keys_neq!(*agent, *beneficiary, TreasuryError::InvalidAuthority);
+    require!(guardian != Some(*agent), TreasuryError::InvalidAuthority);
+    Ok(())
+}
+
 #[program]
 pub mod parralax_agent_treasury {
     use super::*;
 
     pub fn initialize(
         ctx: Context<Initialize>,
-        per_tx_cap: u64,
-        daily_cap: u64,
-        lifetime_cap: u64,
-        expires_at: i64,
+        seed_id: u64,
+        params: PolicyParams,
+        guardian: Option<Pubkey>,
     ) -> Result<()> {
-        require!(valid_caps(per_tx_cap, daily_cap, lifetime_cap), ErrorCode::InvalidCaps);
-        require_keys_neq!(ctx.accounts.owner.key(), ctx.accounts.agent.key(), ErrorCode::InvalidAuthority);
-        require_keys_neq!(ctx.accounts.agent.key(), ctx.accounts.beneficiary.key(), ErrorCode::InvalidAuthority);
         let now = Clock::get()?.unix_timestamp;
-        require!(expires_at > now, ErrorCode::Expired);
+        params.validate(now)?;
+        let mint = &ctx.accounts.mint;
+        require!(
+            mint_policy::is_mint_allowed(&mint.key(), mint.freeze_authority.is_some()),
+            TreasuryError::MintNotAllowed
+        );
+        let owner = ctx.accounts.owner.key();
+        let agent = ctx.accounts.agent.key();
+        let beneficiary = ctx.accounts.beneficiary.key();
+        validate_agent(&agent, &owner, &beneficiary, guardian)?;
+        let mint_key = mint.key();
+
         let t = &mut ctx.accounts.treasury;
-        t.owner = ctx.accounts.owner.key();
-        t.agent = ctx.accounts.agent.key();
-        t.beneficiary = ctx.accounts.beneficiary.key();
-        t.mint = ctx.accounts.mint.key();
-        t.bump = ctx.bumps.treasury;
-        t.per_tx_cap = per_tx_cap;
-        t.daily_cap = daily_cap;
-        t.lifetime_cap = lifetime_cap;
-        t.daily_spent = 0;
-        t.lifetime_spent = 0;
-        t.window_start = now;
-        t.expires_at = expires_at;
-        t.next_nonce = 0;
-        t.revoked = false;
-        emit!(TreasuryCreated { treasury: t.key(), owner: t.owner, agent: t.agent, mint: t.mint });
+        t.set_inner(Treasury {
+            version: TREASURY_VERSION,
+            bump: ctx.bumps.treasury,
+            seed_id,
+            owner,
+            mint: mint_key,
+            beneficiary,
+            agent,
+            guardian,
+            per_tx_cap: params.per_tx_cap,
+            daily_cap: params.daily_cap,
+            lifetime_cap: params.lifetime_cap,
+            daily_spent: 0,
+            lifetime_spent: 0,
+            last_refill_at: now,
+            expires_at: params.expires_at,
+            next_nonce: 0,
+            revoked: false,
+            paused: false,
+        });
+        emit!(TreasuryCreated {
+            treasury: t.key(),
+            owner,
+            agent,
+            beneficiary,
+            mint: mint_key,
+            seed_id,
+            guardian
+        });
         Ok(())
     }
 
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
-        require!(amount > 0, ErrorCode::InvalidAmount);
+        require!(amount > 0, TreasuryError::InvalidAmount);
         token::transfer_checked(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
@@ -56,109 +162,189 @@ pub mod parralax_agent_treasury {
             amount,
             ctx.accounts.mint.decimals,
         )?;
-        emit!(TreasuryDeposit { treasury: ctx.accounts.treasury.key(), amount });
+        emit!(TreasuryDeposit {
+            treasury: ctx.accounts.treasury.key(),
+            amount
+        });
         Ok(())
     }
 
+    /// Agent-signed transfer to the fixed beneficiary. `nonce` must equal
+    /// `next_nonce`: a retried spend (e.g. after blockhash expiry with unknown
+    /// status) cannot pay twice, at the cost of serializing an agent's spends.
     pub fn spend(ctx: Context<Spend>, amount: u64, nonce: u64) -> Result<()> {
-        let t = &mut ctx.accounts.treasury;
         let now = Clock::get()?.unix_timestamp;
-        require!(!t.revoked, ErrorCode::Revoked);
-        require!(now < t.expires_at, ErrorCode::Expired);
-        require!(amount > 0 && amount <= t.per_tx_cap, ErrorCode::PerTransactionLimit);
-        require!(nonce == t.next_nonce, ErrorCode::InvalidNonce);
-        require!(now >= t.window_start, ErrorCode::ClockRegression);
-        if now.saturating_sub(t.window_start) >= 86_400 {
-            t.window_start = now;
-            t.daily_spent = 0;
-        }
-        require!(checked_spend(t.daily_spent, amount, t.daily_cap), ErrorCode::DailyLimit);
-        require!(checked_spend(t.lifetime_spent, amount, t.lifetime_cap), ErrorCode::LifetimeLimit);
-        let daily = t.daily_spent.checked_add(amount).ok_or(ErrorCode::Overflow)?;
-        let lifetime = t.lifetime_spent.checked_add(amount).ok_or(ErrorCode::Overflow)?;
-        require!(daily <= t.daily_cap, ErrorCode::DailyLimit);
-        require!(lifetime <= t.lifetime_cap, ErrorCode::LifetimeLimit);
-        t.daily_spent = daily;
-        t.lifetime_spent = lifetime;
-        t.next_nonce = nonce.checked_add(1).ok_or(ErrorCode::Overflow)?;
-
-        let owner = t.owner;
-        let agent = t.agent;
-        let beneficiary = t.beneficiary;
-        let mint = t.mint;
-        let bump = [t.bump];
-        let seeds: &[&[u8]] = &[b"treasury", owner.as_ref(), agent.as_ref(), beneficiary.as_ref(), mint.as_ref(), &bump];
-        token::transfer_checked(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                TransferChecked {
-                    from: ctx.accounts.vault.to_account_info(),
-                    mint: ctx.accounts.mint.to_account_info(),
-                    to: ctx.accounts.beneficiary_token.to_account_info(),
-                    authority: t.to_account_info(),
-                },
-                &[seeds],
-            ),
+        ctx.accounts.treasury.record_spend(amount, nonce, now)?;
+        let a = &ctx.accounts;
+        transfer_from_vault(
+            &a.treasury,
+            &a.vault,
+            &a.mint,
+            a.beneficiary_token.to_account_info(),
+            &a.token_program,
             amount,
-            ctx.accounts.mint.decimals,
         )?;
-        emit!(TreasurySpend { treasury: t.key(), agent, beneficiary: t.beneficiary, mint: t.mint, amount, nonce });
+        emit!(TreasurySpend {
+            treasury: a.treasury.key(),
+            agent: a.agent.key(),
+            beneficiary: a.treasury.beneficiary,
+            mint: a.treasury.mint,
+            amount,
+            nonce,
+            daily_spent: a.treasury.daily_spent,
+            lifetime_spent: a.treasury.lifetime_spent,
+        });
         Ok(())
     }
 
-    pub fn revoke(ctx: Context<OwnerAction>) -> Result<()> {
+    pub fn withdraw(ctx: Context<OwnerVault>, amount: u64) -> Result<()> {
+        require!(amount > 0, TreasuryError::InvalidAmount);
+        let a = &ctx.accounts;
+        transfer_from_vault(
+            &a.treasury,
+            &a.vault,
+            &a.mint,
+            a.owner_token.to_account_info(),
+            &a.token_program,
+            amount,
+        )?;
+        emit!(TreasuryWithdrawal {
+            treasury: a.treasury.key(),
+            owner: a.owner.key(),
+            amount
+        });
+        Ok(())
+    }
+
+    /// Owner replaces caps and expiry. Accrued usage is kept, so lowering a
+    /// cap below current usage simply blocks spends until usage decays.
+    pub fn update_policy(ctx: Context<OwnerAction>, params: PolicyParams) -> Result<()> {
+        params.validate(Clock::get()?.unix_timestamp)?;
+        let t = &mut ctx.accounts.treasury;
+        t.per_tx_cap = params.per_tx_cap;
+        t.daily_cap = params.daily_cap;
+        t.lifetime_cap = params.lifetime_cap;
+        t.expires_at = params.expires_at;
+        emit!(PolicyUpdated {
+            treasury: t.key(),
+            params
+        });
+        Ok(())
+    }
+
+    /// Owner replaces the agent key. This also clears `revoked`, since a
+    /// revocation is of the old agent key; `paused` is left unchanged.
+    pub fn rotate_agent(ctx: Context<OwnerAction>, new_agent: Pubkey) -> Result<()> {
+        let t = &mut ctx.accounts.treasury;
+        validate_agent(&new_agent, &t.owner, &t.beneficiary, t.guardian)?;
+        let old_agent = t.agent;
+        t.agent = new_agent;
+        t.revoked = false;
+        emit!(AgentRotated {
+            treasury: t.key(),
+            old_agent,
+            new_agent
+        });
+        Ok(())
+    }
+
+    pub fn set_guardian(ctx: Context<OwnerAction>, guardian: Option<Pubkey>) -> Result<()> {
+        let t = &mut ctx.accounts.treasury;
+        require!(guardian != Some(t.agent), TreasuryError::InvalidAuthority);
+        t.guardian = guardian;
+        emit!(GuardianSet {
+            treasury: t.key(),
+            guardian
+        });
+        Ok(())
+    }
+
+    /// Owner or guardian: temporarily stop agent spends.
+    pub fn pause(ctx: Context<GuardianAction>) -> Result<()> {
+        ctx.accounts.treasury.paused = true;
+        emit!(TreasuryPaused {
+            treasury: ctx.accounts.treasury.key(),
+            by: ctx.accounts.authority.key()
+        });
+        Ok(())
+    }
+
+    /// Owner only.
+    pub fn unpause(ctx: Context<OwnerAction>) -> Result<()> {
+        ctx.accounts.treasury.paused = false;
+        emit!(TreasuryUnpaused {
+            treasury: ctx.accounts.treasury.key()
+        });
+        Ok(())
+    }
+
+    /// Owner or guardian: revoke the current agent key (undo via rotate_agent).
+    pub fn revoke(ctx: Context<GuardianAction>) -> Result<()> {
         ctx.accounts.treasury.revoked = true;
-        emit!(TreasuryRevoked { treasury: ctx.accounts.treasury.key() });
+        emit!(TreasuryRevoked {
+            treasury: ctx.accounts.treasury.key(),
+            by: ctx.accounts.authority.key()
+        });
         Ok(())
     }
 
-    pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
-        require!(amount > 0, ErrorCode::InvalidAmount);
-        let t = &ctx.accounts.treasury;
-        let owner = t.owner;
-        let agent = t.agent;
-        let beneficiary = t.beneficiary;
-        let mint = t.mint;
-        let bump = [t.bump];
-        // Must match the Initialize PDA seeds exactly, otherwise invoke_signed
-        // signs for a different address and every owner withdrawal fails.
-        let seeds: &[&[u8]] = &[b"treasury", owner.as_ref(), agent.as_ref(), beneficiary.as_ref(), mint.as_ref(), &bump];
-        token::transfer_checked(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                TransferChecked {
-                    from: ctx.accounts.vault.to_account_info(),
-                    mint: ctx.accounts.mint.to_account_info(),
-                    to: ctx.accounts.owner_token.to_account_info(),
-                    authority: t.to_account_info(),
-                },
-                &[seeds],
-            ),
-            amount,
-            ctx.accounts.mint.decimals,
-        )?;
-        emit!(TreasuryWithdrawal { treasury: t.key(), owner, amount });
+    /// Owner only: drain the vault to the owner, close the vault token account
+    /// and the treasury, and return all rent to the owner.
+    pub fn close(ctx: Context<Close>) -> Result<()> {
+        let a = &ctx.accounts;
+        let remaining = a.vault.amount;
+        if remaining > 0 {
+            transfer_from_vault(
+                &a.treasury,
+                &a.vault,
+                &a.mint,
+                a.owner_token.to_account_info(),
+                &a.token_program,
+                remaining,
+            )?;
+        }
+        let seed_id = a.treasury.seed_id.to_le_bytes();
+        let bump = [a.treasury.bump];
+        let seeds = treasury_signer_seeds(&a.treasury.owner, &a.treasury.mint, &seed_id, &bump);
+        token::close_account(CpiContext::new_with_signer(
+            a.token_program.to_account_info(),
+            CloseAccount {
+                account: a.vault.to_account_info(),
+                destination: a.owner.to_account_info(),
+                authority: a.treasury.to_account_info(),
+            },
+            &[&seeds],
+        ))?;
+        emit!(TreasuryClosed {
+            treasury: a.treasury.key(),
+            owner: a.owner.key(),
+            drained: remaining
+        });
         Ok(())
     }
 }
 
 #[derive(Accounts)]
+#[instruction(seed_id: u64)]
 pub struct Initialize<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
-    /// CHECK: Agent is stored as a public key, and must sign each spend.
+    /// CHECK: stored as a public key; must sign every spend.
     pub agent: UncheckedAccount<'info>,
-    /// CHECK: Beneficiary public key is pinned. SPL destination verified on spends.
+    /// CHECK: stored as a public key; spends go only to its token account for `mint`.
     pub beneficiary: UncheckedAccount<'info>,
     pub mint: Account<'info, Mint>,
     #[account(
-        init, payer = owner, space = 8 + Treasury::INIT_SPACE,
-        seeds = [b"treasury", owner.key().as_ref(), agent.key().as_ref(), beneficiary.key().as_ref(), mint.key().as_ref()],
+        init,
+        payer = owner,
+        space = 8 + Treasury::INIT_SPACE,
+        seeds = [TREASURY_SEED, owner.key().as_ref(), mint.key().as_ref(), &seed_id.to_le_bytes()],
         bump
     )]
     pub treasury: Account<'info, Treasury>,
     #[account(
-        init, payer = owner,
+        init,
+        payer = owner,
         associated_token::mint = mint,
         associated_token::authority = treasury
     )]
@@ -170,9 +356,13 @@ pub struct Initialize<'info> {
 
 #[derive(Accounts)]
 pub struct Deposit<'info> {
-    #[account(mut, address = treasury.owner)]
     pub owner: Signer<'info>,
-    #[account(has_one = owner, has_one = mint)]
+    #[account(
+        seeds = [TREASURY_SEED, treasury.owner.as_ref(), treasury.mint.as_ref(), &treasury.seed_id.to_le_bytes()],
+        bump = treasury.bump,
+        has_one = owner,
+        has_one = mint
+    )]
     pub treasury: Account<'info, Treasury>,
     pub mint: Account<'info, Mint>,
     #[account(mut, token::mint = mint, token::authority = owner)]
@@ -184,9 +374,14 @@ pub struct Deposit<'info> {
 
 #[derive(Accounts)]
 pub struct Spend<'info> {
-    #[account(address = treasury.agent)]
     pub agent: Signer<'info>,
-    #[account(mut, has_one = agent, has_one = mint)]
+    #[account(
+        mut,
+        seeds = [TREASURY_SEED, treasury.owner.as_ref(), treasury.mint.as_ref(), &treasury.seed_id.to_le_bytes()],
+        bump = treasury.bump,
+        has_one = agent,
+        has_one = mint
+    )]
     pub treasury: Account<'info, Treasury>,
     pub mint: Account<'info, Mint>,
     #[account(mut, associated_token::mint = mint, associated_token::authority = treasury)]
@@ -196,19 +391,16 @@ pub struct Spend<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+/// Owner moves funds out of the vault (withdraw).
 #[derive(Accounts)]
-pub struct OwnerAction<'info> {
-    #[account(address = treasury.owner)]
+pub struct OwnerVault<'info> {
     pub owner: Signer<'info>,
-    #[account(mut, has_one = owner)]
-    pub treasury: Account<'info, Treasury>,
-}
-
-#[derive(Accounts)]
-pub struct Withdraw<'info> {
-    #[account(address = treasury.owner)]
-    pub owner: Signer<'info>,
-    #[account(has_one = owner, has_one = mint)]
+    #[account(
+        seeds = [TREASURY_SEED, treasury.owner.as_ref(), treasury.mint.as_ref(), &treasury.seed_id.to_le_bytes()],
+        bump = treasury.bump,
+        has_one = owner,
+        has_one = mint
+    )]
     pub treasury: Account<'info, Treasury>,
     pub mint: Account<'info, Mint>,
     #[account(mut, associated_token::mint = mint, associated_token::authority = treasury)]
@@ -218,72 +410,119 @@ pub struct Withdraw<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-#[account]
-#[derive(InitSpace)]
-pub struct Treasury {
+#[derive(Accounts)]
+pub struct OwnerAction<'info> {
+    pub owner: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [TREASURY_SEED, treasury.owner.as_ref(), treasury.mint.as_ref(), &treasury.seed_id.to_le_bytes()],
+        bump = treasury.bump,
+        has_one = owner
+    )]
+    pub treasury: Account<'info, Treasury>,
+}
+
+#[derive(Accounts)]
+pub struct GuardianAction<'info> {
+    #[account(
+        constraint = authority.key() == treasury.owner
+            || Some(authority.key()) == treasury.guardian @ TreasuryError::Unauthorized
+    )]
+    pub authority: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [TREASURY_SEED, treasury.owner.as_ref(), treasury.mint.as_ref(), &treasury.seed_id.to_le_bytes()],
+        bump = treasury.bump
+    )]
+    pub treasury: Account<'info, Treasury>,
+}
+
+#[derive(Accounts)]
+pub struct Close<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    #[account(
+        mut,
+        close = owner,
+        seeds = [TREASURY_SEED, treasury.owner.as_ref(), treasury.mint.as_ref(), &treasury.seed_id.to_le_bytes()],
+        bump = treasury.bump,
+        has_one = owner,
+        has_one = mint
+    )]
+    pub treasury: Account<'info, Treasury>,
+    pub mint: Account<'info, Mint>,
+    #[account(mut, associated_token::mint = mint, associated_token::authority = treasury)]
+    pub vault: Account<'info, TokenAccount>,
+    #[account(mut, token::mint = mint, token::authority = owner)]
+    pub owner_token: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[event]
+pub struct TreasuryCreated {
+    pub treasury: Pubkey,
     pub owner: Pubkey,
     pub agent: Pubkey,
     pub beneficiary: Pubkey,
     pub mint: Pubkey,
-    pub bump: u8,
-    pub per_tx_cap: u64,
-    pub daily_cap: u64,
-    pub lifetime_cap: u64,
+    pub seed_id: u64,
+    pub guardian: Option<Pubkey>,
+}
+#[event]
+pub struct TreasuryDeposit {
+    pub treasury: Pubkey,
+    pub amount: u64,
+}
+#[event]
+pub struct TreasurySpend {
+    pub treasury: Pubkey,
+    pub agent: Pubkey,
+    pub beneficiary: Pubkey,
+    pub mint: Pubkey,
+    pub amount: u64,
+    pub nonce: u64,
     pub daily_spent: u64,
     pub lifetime_spent: u64,
-    pub window_start: i64,
-    pub expires_at: i64,
-    pub next_nonce: u64,
-    pub revoked: bool,
 }
-
 #[event]
-pub struct TreasuryCreated { pub treasury: Pubkey, pub owner: Pubkey, pub agent: Pubkey, pub mint: Pubkey }
-#[event]
-pub struct TreasuryDeposit { pub treasury: Pubkey, pub amount: u64 }
-#[event]
-pub struct TreasurySpend { pub treasury: Pubkey, pub agent: Pubkey, pub beneficiary: Pubkey, pub mint: Pubkey, pub amount: u64, pub nonce: u64 }
-#[event]
-pub struct TreasuryRevoked { pub treasury: Pubkey }
-#[event]
-pub struct TreasuryWithdrawal { pub treasury: Pubkey, pub owner: Pubkey, pub amount: u64 }
-
-#[error_code]
-pub enum ErrorCode {
-    #[msg("Owner, agent and beneficiary must have distinct authority")] InvalidAuthority,
-    #[msg("Invalid spending caps")] InvalidCaps,
-    #[msg("Treasury expired")] Expired,
-    #[msg("Treasury revoked")] Revoked,
-    #[msg("Invalid amount")] InvalidAmount,
-    #[msg("Per-transaction limit reached")] PerTransactionLimit,
-    #[msg("Daily limit reached")] DailyLimit,
-    #[msg("Lifetime limit reached")] LifetimeLimit,
-    #[msg("Invalid replay nonce")] InvalidNonce,
-    #[msg("Arithmetic overflow")] Overflow,
-    #[msg("Clock regression")] ClockRegression,
+pub struct TreasuryWithdrawal {
+    pub treasury: Pubkey,
+    pub owner: Pubkey,
+    pub amount: u64,
 }
-
-fn valid_caps(per_tx: u64, daily: u64, lifetime: u64) -> bool {
-    per_tx > 0 && per_tx <= daily && daily <= lifetime
+#[event]
+pub struct PolicyUpdated {
+    pub treasury: Pubkey,
+    pub params: PolicyParams,
 }
-fn checked_spend(current: u64, amount: u64, cap: u64) -> bool {
-    current.checked_add(amount).map(|next| next <= cap).unwrap_or(false)
+#[event]
+pub struct AgentRotated {
+    pub treasury: Pubkey,
+    pub old_agent: Pubkey,
+    pub new_agent: Pubkey,
 }
-#[cfg(test)]
-mod invariant_tests {
-    use super::*;
-    #[test]
-    fn cap_ordering() {
-        assert!(valid_caps(1, 10, 100));
-        assert!(!valid_caps(0, 10, 100));
-        assert!(!valid_caps(11, 10, 100));
-        assert!(!valid_caps(1, 101, 100));
-    }
-    #[test]
-    fn spending_arithmetic_and_limits() {
-        assert!(checked_spend(7, 3, 10));
-        assert!(!checked_spend(8, 3, 10));
-        assert!(!checked_spend(u64::MAX, 1, u64::MAX));
-        assert!(checked_spend(0, 1, 1));
-    }
+#[event]
+pub struct GuardianSet {
+    pub treasury: Pubkey,
+    pub guardian: Option<Pubkey>,
+}
+#[event]
+pub struct TreasuryPaused {
+    pub treasury: Pubkey,
+    pub by: Pubkey,
+}
+#[event]
+pub struct TreasuryUnpaused {
+    pub treasury: Pubkey,
+}
+#[event]
+pub struct TreasuryRevoked {
+    pub treasury: Pubkey,
+    pub by: Pubkey,
+}
+#[event]
+pub struct TreasuryClosed {
+    pub treasury: Pubkey,
+    pub owner: Pubkey,
+    pub drained: u64,
 }
