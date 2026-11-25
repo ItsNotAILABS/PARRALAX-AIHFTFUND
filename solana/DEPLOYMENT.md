@@ -1,31 +1,74 @@
-# Agent Treasury — deployment and verification runbook
+# Agent Treasury: deployment and verification runbook
 
-**Unexecuted runbook, not a release receipt.** Do not deploy a System Program placeholder or fund mainnet from this source without audit.
+**Unexecuted for devnet/mainnet. Not a release receipt.** Nothing here has been
+deployed outside a local validator, and the program has not been audited.
 
-## Local validation
-1. Install the verified Solana CLI, Rust, Anchor CLI **0.30.1**, Node >=20, npm.
-2. `solana config set --url localhost`; start `solana-test-validator --reset` in a dedicated terminal.
-3. From the **repository root** (the root `Anchor.toml` owns this workspace), generate a *new local-only program key*: `solana-keygen new --no-bip39-passphrase --outfile target/deploy/parralax_agent_treasury-keypair.json`.
-4. Record the public address with `solana-keygen pubkey target/deploy/parralax_agent_treasury-keypair.json`. Replace placeholder IDs in `programs/agent-treasury/src/lib.rs`, **root** `Anchor.toml` and `programs/agent-treasury/Anchor.toml` with that exact address. Do not commit the deploy keypair or place it under a browser bundle.
-5. `anchor build` and `anchor deploy --provider.cluster localnet`. Verify program account owner, executable state, correct program ID and upgrade authority with Solana CLI.
-6. `cd programs/agent-treasury && npm install && npm run test:localnet`. Collect **actual** validator signatures, account deltas, and transaction logs. Run source check with `npm run test:source`. The source test harness loads the root-workspace `target/idl` artifact.
-7. Repeat tests for invalid token account, wrong beneficiary, forged agent, expired vault, wrong mint, vault drained, wrong nonce, over-budget, rolled day, and failed CPI rollback. Audit before any outside funding.
+All commands run from `solana/` (the single Anchor + Cargo workspace).
+
+## Pinned toolchain
+| Tool | Version | Where pinned |
+|---|---|---|
+| Rust (host, tests, clippy) | 1.79.0 | `rust-toolchain.toml` |
+| Rust nightly (IDL build only) | nightly-2024-11-01 | CI `IDL_NIGHTLY`; run `RUSTUP_TOOLCHAIN=nightly-2024-11-01 anchor build` |
+| Solana / Agave CLI + platform-tools | 1.18.26 | `Anchor.toml [toolchain]`, CI |
+| Anchor CLI / crates | 0.30.1 | `Anchor.toml`, `Cargo.toml` (`=0.30.1`), `Cargo.lock` |
+| JS test deps | exact | `package.json`, `package-lock.json` |
+
+`Cargo.lock` is committed and resolved for rustc 1.75 (the SBF platform-tools
+compiler). Do not `cargo update` without re-running the full suite; several
+transitive crates are deliberately held back (blake3, proc-macro2, ahash, ...).
+
+## Local validation (reproducible)
+1. Install the pinned tools above, Node >= 20 and `bzip2` (the test validator needs it).
+2. `solana-keygen new --no-bip39-passphrase -o ~/.config/solana/id.json` (throwaway localnet wallet).
+3. `anchor keys sync` if your `target/deploy/parralax_agent_treasury-keypair.json` differs from `declare_id!`.
+4. `cargo fmt --check && cargo clippy --all-targets -- -D warnings`
+5. `cargo test` (unit + native program tests)
+6. `RUSTUP_TOOLCHAIN=nightly-2024-11-01 anchor build`
+7. `SBF_OUT_DIR=$PWD/target/deploy cargo test --test program` (same tests against the SBF binary)
+8. `npm ci && anchor test --skip-build` (end-to-end on `solana-test-validator`)
+
+CI (`.github/workflows/agent-treasury-source-gates.yml`) runs exactly these steps.
+
+## Hard requirements before any non-local deployment
+These are release blockers, not recommendations.
+
+1. **Upgrade authority is a multisig.** Deploy, then immediately transfer the
+   upgrade authority to a Squads (or equivalent) multisig with a timelock:
+   `solana program set-upgrade-authority <PROGRAM_ID> --new-upgrade-authority <MULTISIG_VAULT>`.
+   A single hot key as upgrade authority can replace the program and drain every
+   vault regardless of caps. Alternatively make the program immutable
+   (`--final`) after audit. Record the authority in `RELEASE_STATUS.json`.
+2. **Verifiable build.** Build with `anchor build --verifiable` (or
+   `solana-verify build`) from a tagged commit, deploy that artifact, and publish
+   the hash so anyone can check the on-chain program matches the source
+   (`solana-verify verify-from-repo`).
+3. **Managed program keypair.** Generate the production program keypair inside
+   the release process, replace the localnet `declare_id!` and add a
+   `[programs.<cluster>]` entry in the same reviewed commit. Never commit keypairs
+   (`*-keypair.json` is git-ignored).
+4. **Owner is a multisig** (Squads vault PDA) for any treasury holding real
+   funds. The owner can withdraw everything at any time by design.
+5. **Guardian configured.** Set a separate guardian key (incident responder) on
+   every funded treasury so spending can be paused without the owner multisig.
+6. **Production mint policy.** Build with `--features allowlist-only` and review
+   `src/mint_policy.rs::ALLOWED_MINTS` (USDC mainnet/devnet).
+7. **Independent security audit** of the program and this deployment process.
 
 ## Devnet
-- Create a **separate** devnet program keypair; never reuse local program key or program ID without deliberate governance.
-- Use dedicated devnet owner and agent wallets holding only airdropped SOL and an explicitly tagged test mint. Do not use real USDC or mainnet private keys.
-- Deploy with `anchor deploy --provider.cluster devnet`; verify address, IDL, account owners, executable flag, upgrade authority and program data.
-- Run the integration flow with devnet balances and store transaction signatures in a signed `receipts/devnet.json` manifest that explicitly lists network, program ID, mint, owner, agent, beneficiary, policy and post-transaction account balances.
-- No staged source code, test mock or returned signature alone proves confirmation. Check transaction status and token balances independently.
+- Separate devnet program keypair and multisig; never reuse localnet keys.
+- Dedicated owner/agent/guardian wallets holding only airdropped SOL and a tagged test mint.
+- Verify program ID, IDL, upgrade authority, executable flag and program data hash after deploy.
+- Store transaction signatures and post-transaction balances in a signed
+  `receipts/devnet.json`. A returned signature alone does not prove settlement; check
+  confirmation status and token balances independently.
 
-## Funding and governance
-- Owner wallet signs creation and funding.
-- Agent wallet only signs a fixed-recipient payment bounded by hard cap/expiry/nonce; isolate agent signing service.
-- PARRALAX server authenticates agent/workspace, checks durable off-chain policy, logs an immutable request; on-chain program is the final fund movement guard.
-- Owner retains withdrawal/revocation. Document whether multisig governance, emergency freeze, upgrade locks and recovery are enabled before mainnet.
-
-## Release status
-`NODE`, `cargo`, `anchor`, and `solana` were not all available in the authoring runtime. GitHub source updates completed, but Rust compilation, local validator tests, devnet transaction, security audit and production deployment **have not run**.
-
-## CI status note (2026-11-06)
-GitHub reported completed/failing jobs for the new source-check workflow but returned zero step summaries, and job-log downloads returned 404. This is **not** a Rust compiler diagnostic or a passing test receipt. Investigate GitHub Actions runner availability, job provisioning and billing before interpreting it as a source failure.
+## Operating model
+- Owner (multisig): initialize, deposit, withdraw, update_policy, rotate_agent, set_guardian, unpause, close.
+- Guardian: pause, revoke. Nothing else.
+- Agent (isolated signer service): spend to the fixed beneficiary within caps,
+  using a strictly sequential nonce. Serialize spends per treasury; on an unknown
+  outcome, re-read `next_nonce` before retrying, so a retry can never pay twice.
+- Off-chain PARRALAX policy is advisory; the on-chain caps are the hard guard.
+- Caps are per treasury. An agent key attached to N treasuries can spend the sum
+  of their caps; keep one agent key per treasury, or track aggregate exposure off-chain.
