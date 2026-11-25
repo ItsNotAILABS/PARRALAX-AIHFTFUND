@@ -17,7 +17,11 @@ export async function runResearchSwarm({requestId,tenantId,symbol,workers,contex
  const snapshots=Object.freeze({requestId,tenantId,symbol,context:Object.freeze({...context})});
  const receipts=await Promise.all(entries.map(async([role,run])=>{
   try{
-   const output=await run(snapshots,{signal:AbortSignal.timeout(timeoutMs)});
+   const signal=AbortSignal.timeout(timeoutMs);
+   const output=await Promise.race([
+    Promise.resolve().then(()=>run(snapshots,{signal})),
+    new Promise((_,reject)=>setTimeout(()=>reject(Error("WORKER_DEADLINE")),timeoutMs))
+   ]);
    if(!output||typeof output!=="object"||!["PASS","VETO","UNKNOWN"].includes(output.state))
     throw Error("INVALID_WORKER_OUTPUT");
    if(output.canSign===true||output.executionAuthorized===true||output.transaction!=null)
