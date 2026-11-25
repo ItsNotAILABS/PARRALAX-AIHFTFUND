@@ -9,7 +9,7 @@ const limits={allowedVenues:["jupiter"],allowedMints:[mint],allowedSides:["buy",
  maxGrossUsd:250,maxTurnoverUsd:500,maxDailyLossPct:0.03,maxDrawdownPct:0.06,
  maxLeverage:1,maxImpactBps:40,maxSpreadBps:45,maxQuoteAgeMs:2500,maxOracleAgeMs:3000,
  maxOpenOrders:2,minLiquidityUsd:250000};
-const evidence={quoteId:"q1",issuerId:"provider1",observedAtMs:now-500,issuerPolicyVersion:POLICY_VERSION,trustedIngestion:true,principalEligible:true};
+const evidence={quoteId:"q1",issuerId:"provider1",observedAtMs:now-500,issuerPolicyVersion:POLICY_VERSION,trustedIngestion:true,principalEligible:true,reduceOnlyVerified:true};
 function check(patch={}){return evaluatePretrade({order:{...order,...patch.order},portfolio:{...portfolio,...patch.portfolio},
  market:{...market,...patch.market},limits:{...limits,...patch.limits},evidence:{...evidence,...patch.evidence}},now)}
 test("agent roles cannot sign or spend",()=>assert.ok(AGENT_ROLES.every(r=>r.capabilities.every(c=>!/sign|submit|withdraw|transfer/.test(c)))));
@@ -33,4 +33,13 @@ test("fail closed across risk and data scenarios",()=>{
 test("close proposals bypass exposure cap but still require signature",()=>{
  let r=check({order:{side:"close"},portfolio:{exposureUsd:9999,openOrders:5}});
  assert.equal(r.decision,"APPROVAL_REQUIRED");assert.equal(r.executionAuthorized,false);
+});
+
+test("verified reduce-only close can pass after loss stop, but unverified reduce cannot",()=>{
+ const r=check({order:{side:"close"},portfolio:{equityUsd:900,exposureUsd:9999,openOrders:5,dailyTurnoverUsd:9999}});
+ assert.equal(r.decision,"APPROVAL_REQUIRED");
+ assert.equal(r.executionAuthorized,false);
+ const denied=check({order:{side:"close"},evidence:{reduceOnlyVerified:false}});
+ assert.equal(denied.decision,"DENY");
+ assert.ok(denied.blocks.includes("REDUCE_ONLY_UNVERIFIED"));
 });
