@@ -49,7 +49,8 @@ export function evaluatePretrade({order:o,portfolio:v,market:m,limits:l,evidence
  check(v.equityUsd>v.peakEquityUsd*1.01,"INCONSISTENT_PEAK");
  check(dailyLoss>l.maxDailyLossPct,"DAILY_STOP");
  check(drawdown>l.maxDrawdownPct,"DRAWDOWN_STOP");
- if(["buy","long","short"].includes(o.side)){
+ // Treat ordinary sells as potentially opening unless a separate reduce-only proof exists.
+ if(["buy","sell","long","short"].includes(o.side)){
   check(v.exposureUsd+v.reservedUsd+o.notionalUsd>l.maxGrossUsd,"EXPOSURE");
   check(v.openOrders>=l.maxOpenOrders,"OPEN_ORDERS");
  }
