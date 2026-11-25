@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: "22"
       - name: Pretrade hard-stop risk policies
-        run: node --test services/agent-trading/pretrade.test.mjs
+        run: node --test services/agent-trading/pretrade.test.mjs services/agent-trading/execution-quality.test.mjs
       - name: Market research swarm veto/timeout
         run: node --test services/agent-trading/research-swarm.test.mjs
       - name: Financial backend static syntax
