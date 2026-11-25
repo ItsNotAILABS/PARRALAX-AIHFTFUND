@@ -10,7 +10,7 @@ Eight bounded agent domains are declared in `pretrade.mjs`: market-data QA, liqu
 
 The `evaluatePretrade` function denies missing/invalid inputs, ineligible venues or instruments, leverage or per-order caps, spreads/price impact/slippage, stale oracle/quote data, thin markets, exposure limits, daily P&L stops, drawdown, open orders and turnover.
 
-The server in `server.mjs` offers `POST /v1/agents/pretrade` with service bearer authentication. **It requires an externally supplied `loadTrustedContext` resolver** that retrieves tenant policy, portfolio, oracle, quote provenance and eligibility from trusted stores. It discards any order-supplied portfolio/policy fields. No generic demo resolver is provided; service cannot start without real trusted adapters.
+Verified `close` / `reduce` intents can bypass new-exposure, daily-loss and turnover stops only when a trusted venue adapter proves reduce-only semantics; they still require fresh venue/oracle data and signer approval. No strategy can self-label a new short as a close.\n\nThe server in `server.mjs` offers `POST /v1/agents/pretrade` with service bearer authentication. **It requires an externally supplied `loadTrustedContext` resolver** that retrieves tenant policy, portfolio, oracle, quote provenance and eligibility from trusted stores. It discards any order-supplied portfolio/policy fields. No generic demo resolver is provided; service cannot start without real trusted adapters.
 
 ### Request body
 
