@@ -47,14 +47,18 @@ export function evaluatePretrade({order:o,portfolio:v,market:m,limits:l,evidence
  const dailyLoss=Math.max(0,(v.dayStartEquityUsd-v.equityUsd)/v.dayStartEquityUsd);
  const drawdown=Math.max(0,(v.peakEquityUsd-v.equityUsd)/v.peakEquityUsd);
  check(v.equityUsd>v.peakEquityUsd*1.01,"INCONSISTENT_PEAK");
- check(dailyLoss>l.maxDailyLossPct,"DAILY_STOP");
- check(drawdown>l.maxDrawdownPct,"DRAWDOWN_STOP");
+ const reduceOnly=["close","reduce"].includes(o.side);
+ if(reduceOnly)check(e.reduceOnlyVerified!==true,"REDUCE_ONLY_UNVERIFIED");
+ if(!reduceOnly){
+  check(dailyLoss>l.maxDailyLossPct,"DAILY_STOP");
+  check(drawdown>l.maxDrawdownPct,"DRAWDOWN_STOP");
+ }
  // Treat ordinary sells as potentially opening unless a separate reduce-only proof exists.
  if(["buy","sell","long","short"].includes(o.side)){
   check(v.exposureUsd+v.reservedUsd+o.notionalUsd>l.maxGrossUsd,"EXPOSURE");
   check(v.openOrders>=l.maxOpenOrders,"OPEN_ORDERS");
  }
- check(v.dailyTurnoverUsd+o.notionalUsd>l.maxTurnoverUsd,"TURNOVER");
+ if(!reduceOnly)check(v.dailyTurnoverUsd+o.notionalUsd>l.maxTurnoverUsd,"TURNOVER");
  if(blocked.length)return fail("RISK_GATES_FAILED",blocked);
  return {decision:"APPROVAL_REQUIRED",policyVersion:POLICY_VERSION,requestId:o.requestId,
   tenantId:o.tenantId,agentId:o.agentId,venue:o.venue,quoteId:e.quoteId,
