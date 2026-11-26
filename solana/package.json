@@ -1,0 +1,14 @@
+{
+  "name": "@parralax/agent-treasury-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:source": "node --test tests/preflight.test.mjs",
+    "test:localnet": "anchor test"
+  },
+  "devDependencies": {
+    "@coral-xyz/anchor": "0.30.1",
+    "@solana/spl-token": "0.4.8",
+    "@solana/web3.js": "1.95.3"
+  }
+}

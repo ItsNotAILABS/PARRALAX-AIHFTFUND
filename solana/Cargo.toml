@@ -1,0 +1,17 @@
+# Self-contained Cargo workspace for the Solana programs. It lives under
+# solana/ (not the repo root) so its pinned toolchain and lockfile do not leak
+# into the repository's other Rust crates (rust/, services/, src/fate_engine).
+[workspace]
+members = ["programs/*"]
+resolver = "2"
+
+[profile.release]
+# Never ship a program with wrapping arithmetic.
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1

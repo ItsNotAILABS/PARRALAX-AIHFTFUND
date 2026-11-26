@@ -1,0 +1,58 @@
+{
+  "schema": "parralax.agent-treasury.release-evidence.v1",
+  "recordedAt": "2026-11-24",
+  "status": "SOURCE_ONLY_LOCALNET_TESTED_NOT_DEPLOYABLE",
+  "sourceRepository": "ItsNotAILABS/PARRALAX-AIHFTFUND",
+  "sourcePullRequest": "https://github.com/ItsNotAILABS/PARRALAX-AIHFTFUND/pull/17",
+  "sendaPullRequest": "https://github.com/ItsNotAILABS/Senda/pull/36",
+  "proof": {
+    "anchorSource": true,
+    "spendingPolicySource": true,
+    "ownerFundingAndWithdrawalSource": true,
+    "adversarialValidatorTestSource": true,
+    "sendaInstructionBuilderSource": true,
+    "sendaReceiptContractSource": true,
+    "rustCompiled": true,
+    "solanaSbfBuilt": true,
+    "localValidatorExecuted": true,
+    "devnetDeployed": false,
+    "devnetProgramId": null,
+    "devnetTransactionSignatures": [],
+    "transactionConfirmationVerified": false,
+    "audited": false,
+    "liveAutonomousAgentPaidApiCalls": false,
+    "benchmarkP95Ms": null,
+    "programTestsExecuted": true
+  },
+  "ci": {
+    "observed": "not yet re-run on GitHub",
+    "interpretation": "Earlier runs failed in ~2s with no logs (runner/provisioning). Treat CI as unverified until a green run is linked."
+  },
+  "blockers": [
+    "Managed production program keypair and reviewed declare_id",
+    "Multisig (timelocked) upgrade authority, or immutable program after audit",
+    "Verifiable build hash published and verified on-chain",
+    "Owner multisig and guardian configured for funded treasuries",
+    "allowlist-only production build with reviewed ALLOWED_MINTS",
+    "Green GitHub CI run for the agent-treasury workflow",
+    "Isolated devnet deployment with signed receipts",
+    "Update Senda instruction builder to layout v2 (seed_id, PolicyParams, guardian)",
+    "Independent security audit and custody/compliance review"
+  ],
+  "replaySafe": true,
+  "note": "This is a truth-status manifest, not a hash-signed external audit or proof of transactions.",
+  "programLayoutVersion": 2,
+  "localEvidence": {
+    "note": "Run on a developer box (not CI); reproduce with DEPLOYMENT.md 'Local validation'.",
+    "toolchain": {
+      "rust": "1.79.0",
+      "idlNightly": "nightly-2024-11-01",
+      "solana": "1.18.26",
+      "anchor": "0.30.1"
+    },
+    "cargoTestNative": "9 unit + 17 program tests passed",
+    "cargoTestSbf": "17 program tests passed against target/deploy/parralax_agent_treasury.so",
+    "anchorTest": "8 node tests passed on solana-test-validator (5 source gates + 3 end-to-end)",
+    "clippy": "clean with -D warnings"
+  }
+}
