@@ -1,0 +1,27 @@
+name: PARRALAX institutional trading research gates
+on:
+  pull_request:
+    paths:
+      - "services/agent-trading/**"
+      - ".github/workflows/agent-trading-risk-gates.yml"
+  workflow_dispatch:
+jobs:
+  risk-research-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Pretrade hard-stop risk policies
+        run: node --test services/agent-trading/pretrade.test.mjs services/agent-trading/execution-quality.test.mjs
+      - name: Market research swarm veto/timeout
+        run: node --test services/agent-trading/research-swarm.test.mjs
+      - name: Financial backend static syntax
+        run: |
+          node --check services/agent-trading/pretrade.mjs
+          node --check services/agent-trading/server.mjs
+          node --check services/agent-trading/execution-quality.mjs
+          node --check services/agent-trading/research-swarm.mjs
